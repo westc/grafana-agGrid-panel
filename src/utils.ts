@@ -15,11 +15,9 @@ export default {
         }
         return meta === 'NOW'
           ? nowMoment.format(props.format)
-          : meta === 'TODAY'
-            ? nowMoment.format(props.format ?? 'YYYY-MM-DD')
-            : metas?.hasOwnProperty(meta)
-              ? metas[meta](values)
-              : m;
+          : metas?.hasOwnProperty(meta)
+            ? metas[meta](values)
+            : m;
       }
     );
   }
