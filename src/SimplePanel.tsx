@@ -253,7 +253,7 @@ export const SimplePanel: React.FC<Props> = props => {
     return (
       <div>
         <h2>Error</h2>
-        <pre>{e.message}</pre>
+        <pre>{(e as any).message}</pre>
       </div>
     );
   }
