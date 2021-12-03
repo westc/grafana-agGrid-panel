@@ -17,6 +17,6 @@ export const plugin = new PanelPlugin<SimpleOptions>(SimplePanel).setPanelOption
       editor: DownloadEditorInfo,
       id: 'downloadEditorInfo',
       name: null as any,
-      path: 'downloadEditorInfo'
+      path: 'downloadEditorInfo',
     });
 });
