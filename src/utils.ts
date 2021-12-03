@@ -20,5 +20,24 @@ export default {
             : m;
       }
     );
+  },
+
+  /**
+   * Always returns the same value unless this is an object of some sort or this
+   * is a formula string.
+   * @see https://docs.sheetjs.com/
+   */
+  parseXLSXValue(value: any) {
+    let typeName;
+    if (value instanceof Date || (typeName = typeof value) === 'bigint' || typeName === 'number') {
+      return value;
+    }
+    value = [value] + '';
+    return value[0] === '='
+      ? {f: value.slice(1)}
+      // Makes sure that numbers are represented correctly.
+      : /^-?(?:[1-9]\d*|0)(?:\.\d+)?$/.test(value)
+        ? +value
+        : value;
   }
 };

@@ -17,27 +17,6 @@ import 'ag-grid-community/dist/styles/ag-theme-balham-dark.min.css';
 
 interface Props extends PanelProps<SimpleOptions> {}
 
-/**
- * Always returns the same value unless this is an object of some sort or this
- * is a formula string.
- * @see https://docs.sheetjs.com/
- * @param {any} value
- * @returns {any}
- */
-function _parseXLSXValue(value: any) {
-  let typeName;
-  if (value instanceof Date || (typeName = typeof value) === 'bigint' || typeName === 'number') {
-    return value;
-  }
-  value = [value] + '';
-  return value[0] === '='
-    ? {f: value.slice(1)}
-    // Makes sure that numbers are represented correctly.
-    : /^-?(?:[1-9]\d*|0)(?:\.\d+)?$/.test(value)
-      ? +value
-      : value;
-}
-
 
 export const SimplePanel: React.FC<Props> = props => {
   let { options, data, width, height } = props;
@@ -152,7 +131,7 @@ export const SimplePanel: React.FC<Props> = props => {
                   const wb = XLSX.utils.book_new();
                   const ws = XLSX.utils.aoa_to_sheet(
                     [cols.map(c => columnApi.getDisplayNameForColumn(c, null))].concat(
-                      rows.map(r => cols.map(c => _parseXLSXValue(r.data[(c.getUserProvidedColDef() as ColDef).field as string])))
+                      rows.map(r => cols.map(c => utils.parseXLSXValue(r.data[(c.getUserProvidedColDef() as ColDef).field as string])))
                     )
                   );
                   ws['!cols'] = wsCols;
