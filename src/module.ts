@@ -1,40 +1,22 @@
 import { PanelPlugin } from '@grafana/data';
 import { SimpleOptions } from './types';
 import { SimplePanel } from './SimplePanel';
+import { DownloadEditorInfo } from 'downloadEditorInfo';
 
-export const plugin = new PanelPlugin<SimpleOptions>(SimplePanel).setPanelOptions(builder => {
+export const plugin = new PanelPlugin<SimpleOptions>(SimplePanel).setPanelOptions(function(builder) {
   return builder
     .addTextInput({
-      path: 'text',
-      name: 'Simple text option',
-      description: 'Description of panel option',
-      defaultValue: 'Default value of text input option',
+      category: ['Download'],
+      name: 'Name Pattern',
+      path: 'downloadNamePattern',
+      defaultValue: '<PANEL> (<NOW>).<EXT>',
+      description: 'This is a description.',
     })
-    .addBooleanSwitch({
-      path: 'showSeriesCount',
-      name: 'Show series counter',
-      defaultValue: false,
-    })
-    .addRadio({
-      path: 'seriesCountSize',
-      defaultValue: 'sm',
-      name: 'Series counter size',
-      settings: {
-        options: [
-          {
-            value: 'sm',
-            label: 'Small',
-          },
-          {
-            value: 'md',
-            label: 'Medium',
-          },
-          {
-            value: 'lg',
-            label: 'Large',
-          },
-        ],
-      },
-      showIf: config => config.showSeriesCount,
+    .addCustomEditor({
+      category: ['Download'],
+      editor: DownloadEditorInfo,
+      id: 'downloadEditorInfo',
+      name: null as any,
+      path: 'downloadEditorInfo'
     });
 });

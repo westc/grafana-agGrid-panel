@@ -1,25 +1,68 @@
-import React from 'react';
-import { PanelProps } from '@grafana/data';
+import React, {useState} from 'react';
+import { Button, /*Modal*/ } from '@grafana/ui';
+import { PanelProps, urlUtil } from '@grafana/data';
 import { SimpleOptions } from 'types';
 import { css, cx } from 'emotion';
 import { stylesFactory, useTheme } from '@grafana/ui';
-import { AgGridColumn, AgGridReact } from 'ag-grid-react';
+import { AgGridReact } from 'ag-grid-react';
+import { ColDef, ColumnMovedEvent, ColumnPinnedEvent, SortChangedEvent, ColumnApi, GridApi } from 'ag-grid-community';
+import utils from './utils';
+import XLSX from 'xlsx';
+
+// Include AG Grid CSS
 import 'ag-grid-community/dist/styles/ag-grid.css';
-import 'ag-grid-community/dist/styles/ag-theme-alpine.css';
-import { ColDef } from 'ag-grid-community';
+import 'ag-grid-community/dist/styles/ag-theme-balham.min.css';
+import 'ag-grid-community/dist/styles/ag-theme-balham-dark.min.css';
+
 
 interface Props extends PanelProps<SimpleOptions> {}
 
-const theme = useTheme();
-
-function createFlagImg(flag: string) {
-  return `<img border="0" width="15" height="10" src="https://flags.fmcdn.net/data/flags/mini/${flag}.png"/>`;
+/**
+ * Always returns the same value unless this is an object of some sort or this
+ * is a formula string.
+ * @see https://docs.sheetjs.com/
+ * @param {any} value
+ * @returns {any}
+ */
+function _parseXLSXValue(value: any) {
+  let typeName;
+  if (value instanceof Date || (typeName = typeof value) === 'bigint' || typeName === 'number') {
+    return value;
+  }
+  value = [value] + '';
+  return value[0] === '='
+    ? {f: value.slice(1)}
+    // Makes sure that numbers are represented correctly.
+    : /^-?(?:[1-9]\d*|0)(?:\.\d+)?$/.test(value)
+      ? +value
+      : value;
 }
 
-export const SimplePanel: React.FC<Props> = ({ options, data, width, height }) => {
+
+export const SimplePanel: React.FC<Props> = props => {
+  let { options, data, width, height } = props;
+  console.log({props});
+  
+  // let [modalIsOpen, setModalIsOpen] = useState(false);
+  let [tempColDefs, setTempColDefs] = useState(options.columnDefs);
+
+  // Setup isEditing as a state property.
+  const [isEditing, setIsEditing] = useState(!!urlUtil.getUrlSearchParams().editPanel);
+  setTimeout(_ => {
+    try {
+      let newIsEditing = !!urlUtil.getUrlSearchParams().editPanel;
+      if (isEditing !== newIsEditing) setIsEditing(newIsEditing);
+    } catch (e) {}
+  }, 50);
+
+  // const onModalClose = () => {
+  //   setModalIsOpen(false);
+  // };
+
   try {
     const styles = getStyles();
-
+    const theme = useTheme();
+    
     const defaultColDef: ColDef = {
       resizable: true,
       sortable: true,
@@ -28,176 +71,161 @@ export const SimplePanel: React.FC<Props> = ({ options, data, width, height }) =
       minWidth: 100,
     };
 
-    const getContextMenuItems = (params: any) => {
-      var result = [
-        {
-          name: 'Alert ' + params.value,
-          action: function() {
-            window.alert('Alerting about ' + params.value);
-          },
-          cssClasses: ['redFont', 'bold'],
-        },
-        {
-          name: 'Always Disabled',
-          disabled: true,
-          tooltip: 'Very long tooltip, did I mention that I am very long, well I am! Long!  Very Long!',
-        },
-        {
-          name: 'Country',
-          subMenu: [
-            {
-              name: 'Ireland',
-              action: function() {
-                console.log('Ireland was pressed');
-              },
-              icon: createFlagImg('ie'),
-            },
-            {
-              name: 'UK',
-              action: function() {
-                console.log('UK was pressed');
-              },
-              icon: createFlagImg('gb'),
-            },
-            {
-              name: 'France',
-              action: function() {
-                console.log('France was pressed');
-              },
-              icon: createFlagImg('fr'),
-            },
-          ],
-        },
-        {
-          name: 'Person',
-          subMenu: [
-            {
-              name: 'Niall',
-              action: function() {
-                console.log('Niall was pressed');
-              },
-            },
-            {
-              name: 'Sean',
-              action: function() {
-                console.log('Sean was pressed');
-              },
-            },
-            {
-              name: 'John',
-              action: function() {
-                console.log('John was pressed');
-              },
-            },
-            {
-              name: 'Alberto',
-              action: function() {
-                console.log('Alberto was pressed');
-              },
-            },
-            {
-              name: 'Tony',
-              action: function() {
-                console.log('Tony was pressed');
-              },
-            },
-            {
-              name: 'Andrew',
-              action: function() {
-                console.log('Andrew was pressed');
-              },
-            },
-            {
-              name: 'Kev',
-              action: function() {
-                console.log('Kev was pressed');
-              },
-            },
-            {
-              name: 'Will',
-              action: function() {
-                console.log('Will was pressed');
-              },
-            },
-            {
-              name: 'Armaan',
-              action: function() {
-                console.log('Armaan was pressed');
-              },
-            },
-          ],
-        },
-        'separator',
-        {
-          name: 'Windows',
-          shortcut: 'Alt + W',
-          action: function() {
-            console.log('Windows Item Selected');
-          },
-          icon: '<img src="https://www.ag-grid.com/example-assets/skills/windows.png" />',
-        },
-        {
-          name: 'Mac',
-          shortcut: 'Alt + M',
-          action: function() {
-            console.log('Mac Item Selected');
-          },
-          icon: '<img src="https://www.ag-grid.com/example-assets/skills/mac.png"/>',
-        },
-        'separator',
-        {
-          name: 'Checked',
-          checked: true,
-          action: function() {
-            console.log('Checked Selected');
-          },
-          icon: '<img src="https://www.ag-grid.com/example-assets/skills/mac.png"/>',
-        },
-        'copy',
-        'separator',
-        'chartRange',
-      ];
-      return result;
-    };
-
     const series1 = data.series[0];
     const fields1 = data.series[0].fields;
+
+    // Get a list of unique column IDs based on the field names passed from the first query.
+    const colIds = fields1.reduce<string[]>((colIds, field) => {
+      let colId = field.name.replace(/[A-Z]|\d+/g, '_$&').toLowerCase().replace(/[^a-z\d]+/g, '_').replace(/^_(?!\d)|_$/g, '');
+      if (colIds.includes(colId)) {
+        let i = 0;
+        while (colIds.includes(`${colId}_${++i}`));
+        colId = `${colId}_${i}`;
+      }
+      return colIds.concat([colId]);
+    }, []);
+
+    // Get the row data as an array of objects.
     const rowData: any[] = [];
     for (let rowIndex = 0, rowCount = series1.length; rowIndex < rowCount; rowIndex++) {
       rowData.push(
-        fields1.reduce((row, field) => Object.assign(row, { [field.name]: field.values.get(rowIndex) }), {})
+        fields1.reduce((row, field, fieldIndex) => Object.assign(row, { [colIds[fieldIndex]]: field.values.get(rowIndex) }), {})
       );
     }
+    
+    // Get the column definitions keeping what is already there if possible.
+    const savedColDefs = Object(options.columnDefs);
+    const colDefs = fields1.map((field, index) => {
+      const colId = colIds[index];
+      return Object.assign(
+        {headerName: field.name, colId, field: colId},
+        defaultColDef,
+        Object(savedColDefs[colId])
+      );
+    }).sort((a, b) => a.index - b.index);
 
-    console.log({ options, data, width, height, rowData });
+    /**
+     * Called whenever a column moves, is sorted or pinned.
+     * @param e
+     */
+    const onColumnUpdated = (e: (ColumnMovedEvent | ColumnPinnedEvent | SortChangedEvent)) => {
+      setTempColDefs(tempColDefs = (e.api.getColumnDefs() || []).reduce((colDefs, {colId, hide, resizable, sortable, sortIndex, sort, pinned}: ColDef, index) => {
+        return Object.assign(colDefs, { [colId as string]: {colId, hide, resizable, sortable, sortIndex, sort, pinned, index} });
+      }, {}));
+      if (isEditing) {
+        options.columnDefs = tempColDefs;
+      }
+    };
+
+    let gridRef: any = React.useRef(null);
+
+    ;
 
     return (
-      <div
-        className={cx(
-          styles.wrapper,
-          css`
-            width: ${width}px;
-            height: ${height}px;
-          `
-        )}
-      >
-        <div className="ag-theme-alpine" style={{ height: '100%', width: '100%' }}>
-          <AgGridReact
-            rowData={rowData}
-            defaultColDef={defaultColDef}
-            enableRangeSelection={true}
-            allowContextMenuWithControlKey={true}
-            getContextMenuItems={getContextMenuItems}
-          >
-            {fields1.map(field => (
-              <AgGridColumn key={field.name} field={field.name}></AgGridColumn>
-            ))}
-          </AgGridReact>
+      <div className={cx(styles.wrapper, css`width: ${width}px; height: ${height}px;`)}>
+        <div className={css`display: table; width: 100%; height: 100%;`}>
+          <div className={css`display: table-row;`}>
+            <div className={css`display: table-cell; height: 1px;`}>
+
+              <Button
+                icon="cloud-download"
+                onClick={
+                  x => (gridRef.current as {api: GridApi}).api.exportDataAsCsv({
+                    fileName: utils.interpret(options.downloadNamePattern, {
+                      PANEL() { return props.title; },
+                      EXT() { return 'csv'; }
+                    })
+                  })
+                }
+              >CSV&hellip;</Button>
+
+              <Button
+                icon="cloud-download"
+                onClick={x => {
+                  const {api, columnApi} = gridRef.current as {api: GridApi, columnApi: ColumnApi};
+                  let cols = columnApi.getAllDisplayedColumns();
+                  // NOTE:  Get column widths right away to avoid strange width
+                  // reporting later on.
+                  let wsCols = cols.map(c => ({wpx: c.getActualWidth()}));
+                  let rows = (api.getModel() as any).rowsToDisplay as any[];
+
+                  const wb = XLSX.utils.book_new();
+                  const ws = XLSX.utils.aoa_to_sheet(
+                    [cols.map(c => columnApi.getDisplayNameForColumn(c, null))].concat(
+                      rows.map(r => cols.map(c => _parseXLSXValue(r.data[(c.getUserProvidedColDef() as ColDef).field as string])))
+                    )
+                  );
+                  ws['!cols'] = wsCols;
+                  ws['!rows']
+                  XLSX.utils.book_append_sheet(
+                    wb,
+                    ws,
+                    'AIR Intel Data'
+                  );
+
+                  const wbOut = XLSX.write(wb, {
+                    bookType: 'xlsx',
+                    bookSST: true,
+                    type: 'binary'
+                  });
+                  const wbOutBin64 = btoa(wbOut);
+                  Object.assign(
+                    document.createElement('a'),
+                    {
+                      href: `data:;base64,${wbOutBin64}`,
+                      download: utils.interpret(options.downloadNamePattern, {
+                        PANEL() { return props.title; },
+                        EXT() { return 'xlsx'; }
+                      })
+                    }
+                  ).click();
+                }}
+              >Excel&hellip;</Button>
+
+              {/* { isEditing
+                ? <>
+                    <div>{new Date() + ''}</div>
+                    <Button onClick={() => setModalIsOpen(true)}>Open modal</Button>
+                    <Modal title="My Message" isOpen={modalIsOpen}>
+                      Hello world!!!
+                      <Button variant="primary" onClick={onModalClose}>
+                        Close
+                      </Button>
+                    </Modal>
+                  </>
+                : null
+              } */}
+
+            </div>
+          </div>
+          <div className={css`display: table-row;`}>
+            <div className={css`display: table-cell;`}>
+
+              <div className={theme.isDark ? 'ag-theme-balham-dark' : 'ag-theme-balham'} style={{ height: '100%', width: '100%' }}>
+                <AgGridReact
+                  ref={gridRef}
+                  rowData={rowData}
+                  defaultColDef={defaultColDef}
+                  onColumnMoved={onColumnUpdated}
+                  onColumnPinned={onColumnUpdated}
+                  onSortChanged={onColumnUpdated}
+                  columnDefs={colDefs}
+                ></AgGridReact>
+              </div>
+
+            </div>
+          </div>
         </div>
       </div>
     );
-  } catch (e) {
-    console.log('Error:', e);
+  } catch (e: any) {
+    console.error('Error:', e);
+    return (
+      <div>
+        <h2>Error</h2>
+        <pre>{e.message}</pre>
+      </div>
+    );
   }
 };
 
