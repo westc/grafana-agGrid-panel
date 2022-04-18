@@ -10,7 +10,6 @@ export const plugin = new PanelPlugin<SimpleOptions>(SimplePanel).setPanelOption
       name: 'Name Pattern',
       path: 'downloadNamePattern',
       defaultValue: '<PANEL> (<NOW>).<EXT>',
-      description: 'This is a description.',
     })
     .addCustomEditor({
       category: ['Download'],

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button /*Modal*/ } from '@grafana/ui';
+import { Button, Input, InputControl, Label, Modal, TextArea } from '@grafana/ui';
 import { PanelProps, urlUtil } from '@grafana/data';
 import { SimpleOptions } from 'types';
 import { css, cx } from 'emotion';
@@ -20,8 +20,9 @@ export const SimplePanel: React.FC<Props> = props => {
   let { options, data, width, height } = props;
   console.log({ props });
 
-  // let [modalIsOpen, setModalIsOpen] = useState(false);
+  let [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   let [tempColDefs, setTempColDefs] = useState(options.columnDefs);
+  let [downloadNamePattern, setDownloadNamePattern] = useState(options.downloadNamePattern);
 
   // Setup isEditing as a state property.
   const [isEditing, setIsEditing] = useState(!!urlUtil.getUrlSearchParams().editPanel);
@@ -113,6 +114,102 @@ export const SimplePanel: React.FC<Props> = props => {
       }
     };
 
+    const downloaders = [
+      {
+        type: 'Comma Delimited (CSV)',
+        name: utils.interpret(downloadNamePattern, {
+          PANEL() {
+            return props.title;
+          },
+          EXT() {
+            return 'csv';
+          },
+        }),
+        callback() {
+          (gridRef.current as { api: GridApi }).api.exportDataAsCsv({
+            fileName: this.name,
+          });
+        }
+      },
+      {
+        type: 'Pipe Delimited (PSV)',
+        name: utils.interpret(downloadNamePattern, {
+          PANEL() {
+            return props.title;
+          },
+          EXT() {
+            return 'psv';
+          },
+        }),
+        callback() {
+          (gridRef.current as { api: GridApi }).api.exportDataAsCsv({
+            fileName: this.name,
+            columnSeparator: '|'
+          });
+        }
+      },
+      {
+        type: 'Tab Delimited (TSV)',
+        name: utils.interpret(downloadNamePattern, {
+          PANEL() {
+            return props.title;
+          },
+          EXT() {
+            return 'tsv';
+          },
+        }),
+        callback() {
+          (gridRef.current as { api: GridApi }).api.exportDataAsCsv({
+            fileName: this.name,
+            columnSeparator: '\t'
+          });
+        }
+      },
+      {
+        type: 'Excel Workbook (XLSX)',
+        name: utils.interpret(downloadNamePattern, {
+          PANEL() {
+            return props.title;
+          },
+          EXT() {
+            return 'xlsx';
+          },
+        }),
+        callback() {
+          const { api, columnApi } = gridRef.current as { api: GridApi; columnApi: ColumnApi };
+          let cols = columnApi.getAllDisplayedColumns();
+          // NOTE:  Get column widths right away to avoid strange width
+          // reporting later on.
+          let wsCols = cols.map(c => ({ wpx: c.getActualWidth() }));
+          let rows = (api.getModel() as any).rowsToDisplay as any[];
+
+          const wb = XLSX.utils.book_new();
+          const ws = XLSX.utils.aoa_to_sheet(
+            [cols.map(c => columnApi.getDisplayNameForColumn(c, null))].concat(
+              rows.map(r =>
+                cols.map(c =>
+                  utils.parseXLSXValue(r.data[(c.getUserProvidedColDef() as ColDef).field as string])
+                )
+              )
+            )
+          );
+          ws['!cols'] = wsCols;
+          XLSX.utils.book_append_sheet(wb, ws, 'AIR Intel Data');
+
+          const wbOut = XLSX.write(wb, {
+            bookType: 'xlsx',
+            bookSST: true,
+            type: 'binary',
+          });
+          const wbOutBin64 = btoa(wbOut);
+          Object.assign(document.createElement('a'), {
+            href: `data:;base64,${wbOutBin64}`,
+            download: this.name,
+          }).click();
+        }
+      },
+    ].sort((a, b) => a.type < b.type ? -1 : 1);
+
     return (
       <div
         className={cx(
@@ -141,68 +238,52 @@ export const SimplePanel: React.FC<Props> = props => {
                 height: 1px;
               `}
             >
-              <Button
-                icon="cloud-download"
-                onClick={x =>
-                  (gridRef.current as { api: GridApi }).api.exportDataAsCsv({
-                    fileName: utils.interpret(options.downloadNamePattern, {
-                      PANEL() {
-                        return props.title;
-                      },
-                      EXT() {
-                        return 'csv';
-                      },
-                    }),
-                  })
-                }
-              >
-                CSV&hellip;
-              </Button>
 
               <Button
                 icon="cloud-download"
-                onClick={x => {
-                  const { api, columnApi } = gridRef.current as { api: GridApi; columnApi: ColumnApi };
-                  let cols = columnApi.getAllDisplayedColumns();
-                  // NOTE:  Get column widths right away to avoid strange width
-                  // reporting later on.
-                  let wsCols = cols.map(c => ({ wpx: c.getActualWidth() }));
-                  let rows = (api.getModel() as any).rowsToDisplay as any[];
-
-                  const wb = XLSX.utils.book_new();
-                  const ws = XLSX.utils.aoa_to_sheet(
-                    [cols.map(c => columnApi.getDisplayNameForColumn(c, null))].concat(
-                      rows.map(r =>
-                        cols.map(c =>
-                          utils.parseXLSXValue(r.data[(c.getUserProvidedColDef() as ColDef).field as string])
-                        )
-                      )
-                    )
-                  );
-                  ws['!cols'] = wsCols;
-                  XLSX.utils.book_append_sheet(wb, ws, 'AIR Intel Data');
-
-                  const wbOut = XLSX.write(wb, {
-                    bookType: 'xlsx',
-                    bookSST: true,
-                    type: 'binary',
-                  });
-                  const wbOutBin64 = btoa(wbOut);
-                  Object.assign(document.createElement('a'), {
-                    href: `data:;base64,${wbOutBin64}`,
-                    download: utils.interpret(options.downloadNamePattern, {
-                      PANEL() {
-                        return props.title;
-                      },
-                      EXT() {
-                        return 'xlsx';
-                      },
-                    }),
-                  }).click();
+                onClick={() => {
+                  setIsDownloadModalOpen(true);
                 }}
               >
-                Excel&hellip;
+                Download&hellip;
               </Button>
+
+              <Modal title="Download&hellip;" isOpen={isDownloadModalOpen} onDismiss={() => setIsDownloadModalOpen(false)}>
+
+                <label style={{width: '100%'}}>
+                  Naming Pattern
+                  <Input
+                  type="text"
+                  value={downloadNamePattern}
+                  onChange={e => setDownloadNamePattern(e.currentTarget.value)}
+                  css={undefined}
+                  />
+                </label>
+
+                {
+                  downloaders.map(downloader => (
+                    <table style={{width: '100%', margin: '0.5em 0'}} key={downloader.type}>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <Input
+                              css=""
+                              type="text"
+                              readOnly={true}
+                              value={downloader.name}
+                              onClick={e => e.currentTarget.select()}
+                            />
+                          </td>
+                          <td style={{width: 1}}>
+                            <Button icon="cloud-download" onClick={downloader.callback.bind(downloader)}>{downloader.type}</Button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  ))
+                }
+
+              </Modal>
 
               {/* { isEditing
                 ? <>
