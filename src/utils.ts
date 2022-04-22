@@ -28,4 +28,7 @@ export default {
     value = [value] + '';
     return value[0] === '=' ? { f: value.slice(1) } : /^-?(?:[1-9]\d*|0)(?:\.\d+)?$/.test(value) ? +value : value;
   },
+  copyJSON<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value));
+  }
 };
