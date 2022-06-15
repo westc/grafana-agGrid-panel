@@ -1,15 +1,13 @@
-import React, { useState } from 'react';
-import { Button, Input, Modal, Checkbox } from '@grafana/ui';
-import { PanelProps, urlUtil } from '@grafana/data';
+import React, { useState, useEffect } from 'react';
+import { Button, Input, Modal, Checkbox, getTheme, useStyles } from '@grafana/ui';
+import { BusEventBase, PanelProps, urlUtil } from '@grafana/data';
 import { SimpleOptions } from 'types';
 import { css, cx } from 'emotion';
-import { stylesFactory, useTheme } from '@grafana/ui';
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ColumnMovedEvent, ColumnPinnedEvent, SortChangedEvent, ColumnApi, GridApi } from 'ag-grid-community';
 import utils from './utils';
 import XLSX from 'xlsx';
 import Matchly from './libs/Matchly';
-console.log(Matchly);
 
 // Include AG Grid CSS
 import 'ag-grid-community/dist/styles/ag-grid.css';
@@ -35,40 +33,14 @@ const FILTER_OPERATORS = [
   { value: 'contains', label: 'Includes' }
 ];
 
-
 interface Props extends PanelProps<SimpleOptions> {}
 
-class Filter {
-  parts: {
-    value?: string | number | boolean,
-    operator?: string,
-    field?: string
-  }[]
-  expression?: string
-  isActive: boolean
-  expressionError?: string
-
-  constructor(options: {parts?: any, expression?: any, isActive?: any, expressionError?: any}) {
-    this.parts = options.parts ?? [];
-    this.expression = options.expression ?? '';
-    this.isActive = options.isActive ?? false;
-    this.expressionError = options.expressionError ?? undefined;
-  }
-
-  get isValid() {
-    const FILTER_OPERATOR_VALUES = FILTER_OPERATORS.map(o => o.value);
-    return !this.expressionError
-      && !this.parts.find(x => !x.field || !FILTER_OPERATOR_VALUES.includes(x.operator as any));
-  }
-
-  clone() {
-    return new Filter(utils.copyJSON(this));
-  }
-}
-
 export const SimplePanel: React.FC<Props> = props => {
+  subscribeToEvents(props, event => {
+    console.log(event);
+  })
+
   let { options, data, width, height } = props;
-  console.log({ props });
 
   let [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   let [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -92,8 +64,14 @@ export const SimplePanel: React.FC<Props> = props => {
   //   setModalIsOpen(false);
   // };
 
-  const styles = getStyles();
-  const theme = useTheme();
+  const styles = useStyles(() => {
+    return {
+      wrapper: css`
+        position: relative;
+      `,
+    };
+  });
+  const theme = getTheme();
   let gridRef: any = React.useRef(null);
 
   try {
@@ -354,7 +332,6 @@ export const SimplePanel: React.FC<Props> = props => {
                   type="text"
                   value={downloadNamePattern}
                   onChange={e => setDownloadNamePattern(e.currentTarget.value)}
-                  css={undefined}
                   />
                 </label>
 
@@ -365,7 +342,6 @@ export const SimplePanel: React.FC<Props> = props => {
                         <tr>
                           <td>
                             <Input
-                              css=""
                               type="text"
                               readOnly={true}
                               value={downloader.name}
@@ -412,7 +388,6 @@ export const SimplePanel: React.FC<Props> = props => {
                                 setFilterBeingEdited(filterBeingEdited.clone());
                               }
                             }
-                            css={undefined}
                           />
                           {
                             filterBeingEdited.expressionError
@@ -531,7 +506,6 @@ export const SimplePanel: React.FC<Props> = props => {
                                           setFilterBeingEdited(filterBeingEdited.clone());
                                         }
                                       }
-                                      css={undefined}
                                     />
                                   </td>
                                 </tr>
@@ -567,7 +541,6 @@ export const SimplePanel: React.FC<Props> = props => {
                 <div className={css`margin-top: 10px;`}>
                   <div className={css`margin: 0 5px; display: inline-block;`}>
                     <Checkbox
-                      css=""
                       label="Is Active"
                       checked={filterBeingEdited.isActive}
                       onChange={
@@ -657,10 +630,67 @@ export const SimplePanel: React.FC<Props> = props => {
   }
 };
 
-const getStyles = stylesFactory(() => {
-  return {
-    wrapper: css`
-      position: relative;
-    `,
-  };
-});
+class Filter {
+  parts: {
+    value?: string | number | boolean,
+    operator?: string,
+    field?: string
+  }[]
+  expression?: string
+  isActive: boolean
+  expressionError?: string
+
+  constructor(options: {parts?: any, expression?: any, isActive?: any, expressionError?: any}) {
+    this.parts = options.parts ?? [];
+    this.expression = options.expression ?? '';
+    this.isActive = options.isActive ?? false;
+    this.expressionError = options.expressionError ?? undefined;
+  }
+
+  get isValid() {
+    const FILTER_OPERATOR_VALUES = FILTER_OPERATORS.map(o => o.value);
+    return !this.expressionError
+      && !this.parts.find(x => !x.field || !FILTER_OPERATOR_VALUES.includes(x.operator as any));
+  }
+
+  clone() {
+    return new Filter(utils.copyJSON(this));
+  }
+}
+
+function subscribeToEvents(props: React.PropsWithChildren<Props>, handler: (event: BusEventBase) => void) {
+  useEffect(() => {
+    const subscribers = [
+      'panel-queries-changed',
+      'panel-transformations-changed',
+      'panels-options-changed',
+      'dashboard-panels-changed',
+      'panel-directive-ready',
+      'render',
+      'refresh',
+      'zoom-out',
+      'shift-time',
+      'absolute-time',
+      'remove-panel',
+      'show-modal',
+      'show-confirm-modal',
+      'show-react-modal',
+      'hide-modal',
+      'dashboard-saved',
+      'annotation-query-started',
+      'annotation-query-finished',
+      'panel-edit-started',
+      'panel-edit-finished',
+    ].map(name => {
+      class MyPanelEvent extends BusEventBase {
+        static type = name;
+      }
+      return props.eventBus.getStream(MyPanelEvent).subscribe(handler);
+    });
+
+    return () => {
+      subscribers.forEach(s => s.unsubscribe());
+    }
+  }, [props.eventBus]);
+}
+

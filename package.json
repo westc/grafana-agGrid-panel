@@ -13,9 +13,10 @@
   "author": "Chris West",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@grafana/data": "latest",
-    "@grafana/toolkit": "latest",
-    "@grafana/ui": "latest",
+    "@grafana/data": ">=9.X.X",
+    "@grafana/toolkit": ">=9.X.X",
+    "@grafana/runtime": ">=9.X.X",
+    "@grafana/ui": ">=9.X.X",
     "emotion": "10.0.27"
   },
   "engines": {
